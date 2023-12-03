@@ -24,6 +24,10 @@ import base64
 from flask import send_file
 from firebase_admin import db as realtimeDB
 
+force_values = []
+temp_values = []
+
+
 def generate_plot(temperature1, temperature2, duration1, duration2, pressure):
     # Define the limit of parameters
     maxtemperature = 400  # (degree Celsius)
@@ -43,19 +47,20 @@ def generate_plot(temperature1, temperature2, duration1, duration2, pressure):
     # Create temperature function
     temperature12_func = np.piecewise(time12, [time12 < duration1, (time12 >= duration1) & (time12 <= duration2)],
                                       [lambda t: temperature2 / duration1 * t, temperature2])
-    temperature3_func = np.piecewise(time3, [time3 >= duration2], [lambda t: -temperature2 / (maxtime - duration2) * (t - duration2) + temperature2])
+    temperature3_func = np.piecewise(time3, [time3 >= duration2],
+                                     [lambda t: -temperature2 / (maxtime - duration2) * (t - duration2) + temperature2])
 
     # Create pressure function
     pressure_func = np.piecewise(ptime, [ptime < durationtemp, (ptime >= durationtemp) & (ptime <= duration2),
-                                        (ptime >= duration2) & (ptime <= maxtime)],
-                                [0, pressure, 0])
+                                         (ptime >= duration2) & (ptime <= maxtime)],
+                                 [0, pressure, 0])
 
     # Initialize a matplotlib "figure"
     fig, ax1 = plt.subplots()
-    ax1.set_facecolor("black")
+    ax1.set_facecolor("white")
 
     # Set labels for axes and plot temperature
-    color = 'white'
+    color = 'black'
     ax1.set_xlabel('Time (minutes)')
     ax1.set_xlim(0, maxtime)
     ax1.set_ylabel('Temperature (°C)', color="black")
@@ -104,6 +109,54 @@ def generate_plot(temperature1, temperature2, duration1, duration2, pressure):
     return plot_image
 
 
+def create_realtime_plot(force_values, temp_values):
+    # Define the limit of parameters
+    maxtemperature = 400  # (degree Celcius)
+    maxtime = 170  # (minutes)
+    maxforce = 4000  # (N)
+    # values get from realtime firebase data
+    # force_values and temp_values
+    # Available temp values
+    time1 = 60
+    time2 = 90
+    # Time values
+    totaltime = time1 + time2
+    totaltimearray = np.linspace(0, totaltime, len(force_values))
+
+    # Initialize a matplotlib "figure"
+    fig, ax1 = plt.subplots()
+    ax1.set_facecolor("white")
+    # Set labels for axes and plot temperature
+    color = 'tab:red'
+    ax1.set_xlabel('Time (minutes)')
+    ax1.set_xlim(0, maxtime)
+    ax1.set_ylabel('Temperature (°C)', color=color)
+    ax1.set_ylim(0, maxtemperature)
+    ax1.tick_params(axis='y', labelcolor=color)
+    ax1.scatter(totaltimearray, temp_values, color=color, marker='o')  # Use scatter for individual points
+    # Create a new set of axes for pressure
+    ax2 = ax1.twinx()
+    color2 = 'tab:blue'
+    ax2.set_ylabel('Force(N)', color=color2)
+    ax2.set_ylim(0, maxforce)
+    ax2.tick_params(axis='y', labelcolor=color2)
+    ax2.scatter(totaltimearray, force_values, color=color2, marker='o')  # Use scatter for individual points
+    fig.tight_layout()
+
+    # Sau khi hoàn thành vẽ đồ thị, lưu đồ thị vào buffer
+    buffer = BytesIO()
+    plt.savefig(buffer, format='png')
+    plt.close(fig)
+
+    # Di chuyển con trỏ về đầu buffer
+    buffer.seek(0)
+
+    # Đọc nội dung buffer và chuyển đổi thành chuỗi base64
+    plot_image_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+    # Trả về chuỗi base64
+    return plot_image_base64
+
+
 currentuser = None
 app2 = None
 if not firebase_admin._apps:
@@ -115,9 +168,10 @@ if not firebase_admin._apps:
     realtimeDb = os.path.join(current_directory, 'realTimeParam.json')
     realtimeDbCred = credentials.Certificate(realtimeDb)
     app2 = firebase_admin.initialize_app(realtimeDbCred, {
-    'databaseURL': 'https://esp8266demo1-e43a5-default-rtdb.asia-southeast1.firebasedatabase.app'
+        'databaseURL': 'https://esp8266demo1-e43a5-default-rtdb.asia-southeast1.firebasedatabase.app'
     }, name='second_admin_instance')
-    realtimeDatabase = realtimeDB.reference('restricted_access  /secret_document',app2)
+    realtimeDatabase = realtimeDB.reference('restricted_access  /secret_document', app2)
+
 
 @app.route('/')
 @app.route('/index')
@@ -125,11 +179,12 @@ if not firebase_admin._apps:
 def index():
     user = {'username': 'Bao', "email": "test@email.com"}
     if currentuser is None:  # Use 'is' for comparison
-        return render_template("index.html", title='METAL SYNTERING SYSTEM FOR AG POWDER IN MICRO SAMPLES', user=user)
+        return render_template("index.html", title='METAL SINTERING SYSTEM FOR AG POWDER IN MICRO SAMPLES', user=user)
     else:
-        user = User.query.filter_by(username=current_user.username).first_or_404()  
- 
-    return render_template("index.html", title='METAL SYNTERING SYSTEM FOR AG POWDER IN MICRO SAMPLES', user=user)
+        user = User.query.filter_by(username=current_user.username).first_or_404()
+
+    return render_template("index.html", title='METAL SINTERING SYSTEM FOR AG POWDER IN MICRO SAMPLES', user=user)
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -148,12 +203,14 @@ def login():
         return redirect(next_page)
     return render_template('login.html', title='Sign In', form=form)
 
+
 @app.route('/logout')
 def logout():
     global currentuser
     currentuser = None
     logout_user()
     return redirect(url_for('login'))
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -169,6 +226,7 @@ def register():
         return redirect(url_for('login'))
     return render_template('register.html', title='Register', form=form)
 
+
 @app.route('/user/<username>', methods=['GET', 'POST'])
 @login_required
 def user(username):
@@ -180,7 +238,8 @@ def user(username):
     posts = user.posts.all()
     form = PostForm()
     if form.validate_on_submit():
-        p = Post(temp1=int(form.temp1.data), temp2=int(form.temp2.data), time1=int(form.time1.data), time2=int(form.time2.data), status=1, comment=form.comment.data, user_id=user.id)
+        p = Post(temp1=int(form.temp1.data), temp2=int(form.temp2.data), time1=int(form.time1.data),
+                 time2=int(form.time2.data), status=1, comment=form.comment.data, user_id=user.id)
         db.session.add(p)
         db.session.commit()
         print("ok")
@@ -196,6 +255,7 @@ def before_request():
     if current_user.is_authenticated:
         current_user.last_seen = datetime.utcnow()
         db.session.commit()
+
 
 @app.route('/edit_profile', methods=['GET', 'POST'])
 @login_required
@@ -214,6 +274,7 @@ def edit_profile():
         form.email.data = current_user.email
     return render_template('edit_profile.html', title='Edit Profile', form=form)
 
+
 @app.route('/api/sinteringForm', methods=['POST'])
 def submit():
     data = request.json  # Assumes data is sent in JSON format
@@ -224,15 +285,16 @@ def submit():
     history_ref = firebaseDb.collection('history')
 
     # Create a new collection named after the user's ID if it doesn't exist
-    user_collection = history_ref.document(user_id)  # Use user_id as the document name 
+    user_collection = history_ref.document(user_id)  # Use user_id as the document name
     user_collection.set({})  # Create an empty document if it doesn't exist
 
     new_record = user_collection.collection(time_submit).document()
-    new_record.set(history_data, merge=True) 
+    new_record.set(history_data, merge=True)
 
     ref = realtimeDB.reference('/input', app2)
     ref.update(history_data)
     return jsonify({"message": "Data submitted successfully"})
+
 
 @app.route('/api/history/<user_id>', methods=['GET'])
 def get_user_data(user_id):
@@ -240,16 +302,16 @@ def get_user_data(user_id):
     if not user_id:
         return jsonify({"error": "Invalid user_id"}), 400
 
-
     history_ref = firebaseDb.collection('history').document(user_id)
     collections = history_ref.collections()
     documents_list = []
-    
+
     for collection_ref in collections:
         for doc_ref in collection_ref.list_documents():
             documents_list.append(doc_ref.get().to_dict())
-    
+
     return jsonify(documents_list)
+
 
 @app.route('/generate_plot', methods=['GET'])
 def generate_plot_api():
@@ -266,6 +328,13 @@ def generate_plot_api():
     # Return the plot image as a response
     return send_file(BytesIO(base64.b64decode(plot_image)), mimetype='image/png')
 
+
+@app.route('/generate_realtime_plot', methods=['GET'])
+def generate_realtime_plot():
+    plot_image_base64 = create_realtime_plot(force_values, temp_values)
+    return jsonify({"plot_image": plot_image_base64})
+
+
 @app.route('/api/real-time-param', methods=['GET'])
 def fetch_data():
     try:
@@ -279,3 +348,30 @@ def fetch_data():
         return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)})
+
+
+@app.route('/api/real-time-plot', methods=['GET'])
+def realtime_plot_api():
+    ref = realtimeDB.reference('/output', app2)
+    output_data = ref.get()
+
+    force_value = output_data.get('force', 0)
+    temp_value = output_data.get('temp', 0)
+    # Nếu dữ liệu từ Firebase là 0, xóa toàn bộ dữ liệu
+    if force_value == 0:
+        force_values.clear()
+        temp_values.clear()
+    else:
+        # Thêm dữ liệu mới vào danh sách
+        force_values.append(force_value)
+        temp_values.append(temp_value)
+    # Tạo đồ thị thời gian thực
+    plot_image_base64 = create_realtime_plot(force_values, temp_values)
+
+    return jsonify({
+        "force": force_value,
+        "temp": temp_value,
+        "plot_image": plot_image_base64
+    })
+
+

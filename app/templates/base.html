@@ -47,9 +47,9 @@
                 <p>Hello, <a href="{{ url_for('user', username=current_user.username) }}">{{ current_user.username }}</a></p>
             </div>
             {% if title %}
-            <h1>{{ title }} - microblog</h1>
+            <h1>{{ title }}</h1>
             {% else %}
-            <h1>METAL SYNTERING SYSTEM FOR AG POWDER IN MICRO SAMPLES</h1>
+            <h1>METAL SINTERING SYSTEM FOR AG POWDER IN MICRO SAMPLES</h1>
             {% endif %}
             {% if not current_user.is_anonymous %}
             <div>

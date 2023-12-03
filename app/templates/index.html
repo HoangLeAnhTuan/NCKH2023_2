@@ -61,9 +61,13 @@
     justify-content: center;
     align-items: center;
   }
+  .d-flex text-white bg-dark dashboard {
+  background-color : #FFFFFF
+  color : #000000
+  }
 </style>
 
-<div class="d-flex text-white bg-dark dashboard">
+<div class="d-flex text-dark bg-white dashboard">
   <div class="d-flex flex-column row-gap-6 column border-white border dashboard-tile">
         <div class="border border-success">
           <h2>Instruction</h2>
@@ -91,7 +95,7 @@
     <div class="custom-card">
       <div class="custom-card-body">
             <h4>INPUT PARAMETER</h4>
-        <table class="table table-bordered custom-table  table-dark">
+        <table class="table table-bordered custom-table  table-white">
           <thead>
             <tr>
               <th>Sample (No.)</th>
@@ -144,14 +148,14 @@
   <div class="column border-white border">
     <div class="custom-card">
       <div class="custom-card-body">
-        <table class="table table-striped table-bordered table-hover table-dark p-0 m-0">
+        <table class="table table-striped table-bordered table-hover table-white p-0 m-0">
         <thead >
             <tr>
         <th class="d-flex justify-content-center">REAL TIME PARAMATER</th>
             </tr>
         </thead>
         </table>
-        <table class="table table-striped table-bordered table-hover custom-table table-dark" id="realTimeParam">
+        <table class="table table-striped table-bordered table-hover custom-table table-white" id="realTimeParam">
            <thead >
               <tr>
                 <th>Force</th>
@@ -168,7 +172,11 @@
           </table>
       </div>
     </div>
+    <div id="realtimePlotContainer" class="column border-white border">
+      <!-- Placeholder for realtime-plot image -->
+    </div>
   </div>
+
   <div class="modal fade " id="exampleModalLong" tabindex="-1" role="dialog" aria-labelledby="exampleModalLongTitle" aria-hidden="true">
     <div class="modal-dialog modal-xl" role="document">
       <div class="modal-content">
@@ -203,9 +211,9 @@
     </div>
   </div>
   <script type = "module" >
-  
+
   const table = document.getElementById("realtimeParam");
-  
+
   function fetchRealTimeParam() {
       // Make a GET request to your API endpoint
       fetch('/api/real-time-param')
@@ -214,22 +222,22 @@
               console.log(data)
               const table = document.getElementById("realTimeParam");
               const existingRow = document.getElementById("realTimeParam-row");
-  
+
               // If an existing row exists, remove it
               if (existingRow) {
                   table.deleteRow(existingRow.rowIndex);
               }
-  
+
               // Create a new row and cells
               const row = table.insertRow();
               row.id = "realTimeParam-row"; // Set an ID for the new row for replacement
-  
+
               // Insert data into the row's cells
               const forceCell = row.insertCell(0);
               const tempCell = row.insertCell(1);
               const periodCell = row.insertCell(2);
               const timeLeftCell = row.insertCell(3);
-  
+
               forceCell.textContent = data.force;
               tempCell.textContent = data.temp;
               periodCell.textContent = data.period;
@@ -239,7 +247,7 @@
               console.error('Error fetching data:', error);
           });
   }
-  
+
   // Call the fetchData function every 1 minute (60,000 milliseconds)
   setInterval(fetchRealTimeParam, 3600000);
   fetchRealTimeParam();
@@ -248,7 +256,7 @@
   // Function to submit data to Firebase
   function submitData() {
       var form = document.getElementById("sinteringForm");
-  
+
       // Create a data object from the form inputs
       const formData = {
         sample1: parseFloat(form.sample1.value),
@@ -284,8 +292,8 @@
           .catch(error => {
               console.error('Error:', error);
           });
-  
-  
+
+
       fetch(`/generate_plot?temperature1=${formData.temp1}&temperature2=${formData.temp2}&duration1=${formData.duration1}&duration2=${formData.duration2}&pressure=${formData.pressure1}`)
           .then(response => response.blob())
           .then(blob => {
@@ -299,13 +307,13 @@
               console.error('Error:', error);
           });
   }
-  
+
   // Function to retrieve history from Firebase
   function retrieveHistory() {
       var userId = "{{ current_user.username }}";
-  
+
       // Send a GET request to your Flask API to retrieve the user's history data
-  
+
       fetch('/api/history/' + userId)
           .then(response => response.json())
           .then(historyData => {
@@ -327,7 +335,7 @@
                           </tr>
                       `;
                   }
-               
+
               });
               document.getElementById('historyData').innerHTML = historyDataHtml;
           })
@@ -335,9 +343,39 @@
               console.error('Error:', error);
           });
   }
-  
+
   // Attach event listeners to the buttons
   document.querySelector(".submit-button").addEventListener("click", submitData);
-  document.querySelector("#historyButton").addEventListener("click", retrieveHistory); 
+  document.querySelector("#historyButton").addEventListener("click", retrieveHistory);
+
+
+//// realtime plot
+    // Ví dụ về cách sử dụng fetch để lấy dữ liệu từ API và cập nhật giao diện người dùng
+    function updateRealtimePlot() {
+        fetch('/api/real-time-plot')
+            .then(response => response.json())
+            .then(data => {
+                console.log('Received data from real-time-plot:', data);
+                // Cập nhật giao diện người dùng với dữ liệu mới
+                document.getElementById('forceValue').innerText = `Force: ${data.force}`;
+                document.getElementById('tempValue').innerText = `Temperature: ${data.temp}`;
+
+                // Hiển thị đồ thị thời gian thực trên trang (ví dụ: trong một thẻ img)
+                const plotImageElement = document.createElement('img');
+                plotImageElement.src = `data:image/png;base64, ${data.plot_image}`;
+                document.getElementById('realtimePlotContainer').innerHTML = '';
+                document.getElementById('realtimePlotContainer').appendChild(plotImageElement);
+            })
+            .catch(error => {
+                console.error('Error fetching realtime plot data:', error);
+            });
+    }
+
+    // Gọi hàm cập nhật mỗi khoảng thời gian nhất định (ví dụ: mỗi 5 phút)
+    setInterval(updateRealtimePlot, 300000);
+
+    // Gọi hàm cập nhật lần đầu
+    updateRealtimePlot();
+
   </script>
 {% endblock %}
